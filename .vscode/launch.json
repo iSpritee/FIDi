@@ -1,0 +1,47 @@
+{
+    "version": "0.2.0",
+    "configurations": [ 
+
+        {
+            "name": "test",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "torch.distributed.run",
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "0",
+                "TORCH_DISTRIBUTED_DEBUG": "DETAIL",
+                "TRANSFORMERS_OFFLINE": "1"
+            },
+            "args": [
+                "--nproc_per_node=1",  
+                "--master_port=29503",
+                "${workspaceFolder}/scripts/dist_test_voc_seg_neg.py",
+                "--work_dir=work_dir_voc",
+                "--data_folder=VOCdevkit/VOC2012"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "train",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "torch.distributed.run",
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "0",
+                "TORCH_DISTRIBUTED_DEBUG": "DETAIL",
+                "TRANSFORMERS_OFFLINE": "1"
+            },
+            "args": [
+                "--nproc_per_node=1",  
+                "--master_port=29503",
+                "${workspaceFolder}/scripts/dist_train_voc_seg_neg.py",
+                "--work_dir=work_dir_voc",
+                "--data_folder=VOCdevkit/VOC2012",
+                "--exp=debug"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        }
+    ]
+}

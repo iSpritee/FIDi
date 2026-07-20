@@ -1,0 +1,8 @@
+VOCdevkit/
+MSCOCO/
+work_dir_voc/
+rloss/
+*.pyc
+work_dir_voc/
+work_dir_coco/
+spectral_figures/
