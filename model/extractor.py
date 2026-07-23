@@ -41,7 +41,6 @@ class Extractor(nn.Module):
         for param in self.text_encoder.parameters():
             param.requires_grad = False
 
-        # 设置特征提取参数
         self.block_indices = block_indices
         self.timesteps=timesteps
         self.attention_layers_to_use = attention_layers_to_use
@@ -118,7 +117,6 @@ class Extractor(nn.Module):
         return cross_attention_maps, self_attention_maps
 
     def encoder_forward(self, x):
-        """VAE编码器前向传播"""
         encoder = self.vae.encoder
         features = []
 
@@ -129,7 +127,6 @@ class Extractor(nn.Module):
         # downsampling 
         for i, down_block in enumerate(encoder.down_blocks):
             for j, resnet in enumerate(down_block.resnets):
-                # 在处理前提取特征
                 if block_idx in self.block_indices['encoder']:
                    features.append(h.contiguous())
 
@@ -140,15 +137,13 @@ class Extractor(nn.Module):
                 for downsampler in down_block.downsamplers:
                     h = downsampler(h)
         
-        # 中间块处理
         if encoder.mid_block is not None:
             h = encoder.mid_block(h)
         
         h = encoder.conv_norm_out(h)
         h = encoder.conv_act(h)  # Swish
-        h = encoder.conv_out(h)  # 最终处理步骤
+        h = encoder.conv_out(h) 
       
-        
         moments = self.vae.quant_conv(h)
         posterior = DiagonalGaussianDistribution(moments)
         latents = posterior.mean * self.vae.config.scaling_factor
@@ -160,20 +155,17 @@ class Extractor(nn.Module):
         features = []
         hs = []
 
-        # 时间步嵌入
         timesteps = timesteps.to(dtype=torch.float32)
         t_emb = unet.time_proj(timesteps)
         t_emb = self.unet.time_embedding(t_emb)
         
         h = self.unet.conv_in(x)
-        hs.append(h)  # 存储第1个特征
+        hs.append(h) 
         
-        # Input Blocks 1-10: 遍历所有下采样块
+        # Input Blocks 1-10: 
         for i, down_block in enumerate(unet.down_blocks):
-            # 处理每个 ResNet 块
             for j, resnet in enumerate(down_block.resnets):
                 h = resnet(h, t_emb)
-                # 处理对应的 Attention 块
                 if hasattr(down_block, 'attentions') and j < len(down_block.attentions):
                     h = down_block.attentions[j](
                         h,
