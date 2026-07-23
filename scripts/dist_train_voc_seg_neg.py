@@ -24,8 +24,8 @@ from utils.pyutils import AverageMeter, cal_eta, format_tabs, setup_logger
 torch.hub.set_dir("./pretrained")
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--diffusion_model", default='Manojb/stable-diffusion-2-1-base', type=str, help="Diffusion model name")
-parser.add_argument("--data_folder", default='/media/store2/xln/FIDi/VOCdevkit/VOC2012', type=str, help="dataset folder")
+parser.add_argument("--diffusion_model", default='stabilityai/stable-diffusion-2-1-base', type=str, help="Diffusion model name")
+parser.add_argument("--data_folder", default='../VOCdevkit/VOC2012', type=str, help="dataset folder")
 parser.add_argument("--list_folder", default='datasets/voc', type=str, help="train/val/test list file")
 parser.add_argument("--num_classes", default=21, type=int, help="number of classes")
 parser.add_argument("--ignore_index", default=255, type=int, help="random index")
