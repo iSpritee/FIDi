@@ -28,7 +28,6 @@ class Extractor(nn.Module):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         print(f"[INFO] loading stable diffusion extractor features...")
         
-        # 加载预训练模型组件
         self.vae = AutoencoderKL.from_pretrained(model_name, subfolder="vae").to(self.device)
         self.unet = UNet2DConditionModel.from_pretrained(model_name, subfolder="unet").to(self.device)
         self.text_encoder = CLIPTextModel.from_pretrained(model_name, subfolder="text_encoder").to(self.device)
@@ -156,7 +155,6 @@ class Extractor(nn.Module):
 
         return latents, features
     
-    # 当前的下采样实现需要修改为逐个处理每个块
     def unet_forward(self, x, timesteps, context):
         unet = self.unet
         features = []
@@ -182,22 +180,18 @@ class Extractor(nn.Module):
                         encoder_hidden_states=context,
                         cross_attention_kwargs=None,
                     ).sample
-                hs.append(h)  # 每个 ResNet+Attention 后存储特征
+                hs.append(h) 
             
-            # 处理下采样
             if hasattr(down_block, 'downsamplers') and down_block.downsamplers:
                 h = down_block.downsamplers[0](h)
-                hs.append(h)  # 下采样后存储特征
+                hs.append(h)  
 
-        # 中间块处理
         if unet.mid_block is not None:
             h = unet.mid_block(h, t_emb, encoder_hidden_states=context)
         
         block_idx = 0
         for i, up_block in enumerate(unet.up_blocks):
-            # 处理每个ResNet块
             for resnet_idx, resnet in enumerate(up_block.resnets):
-                # 拼接跳跃连接
                 if hs:
                     h = torch.cat([h, hs.pop()], dim=1)
                 if block_idx in self.block_indices['unet']:
@@ -220,14 +214,12 @@ class Extractor(nn.Module):
         return h, features
     
     def decoder_forward(self, latents):
-        """VAE解码器前向传播"""
         decoder = self.vae.decoder
         features = []
         
         z = 1.0 / self.vae.config.scaling_factor * latents
         h = self.vae.post_quant_conv(z)
         
-        # 初始卷积
         h = decoder.conv_in(h)
         h = decoder.mid_block(h)
 
@@ -235,7 +227,6 @@ class Extractor(nn.Module):
 
         for i, up_block in enumerate(decoder.up_blocks):
             for j, resnet in enumerate(up_block.resnets):
-                # 在处理前提取特征
                 if block_idx in self.block_indices['decoder']:
                     features.append(h.contiguous())
                 
@@ -247,7 +238,6 @@ class Extractor(nn.Module):
             if hasattr(up_block, "upsamplers") and up_block.upsamplers is not None:
                 h = up_block.upsamplers[0](h)
         
-        # 最终归一化和输出
         h = decoder.conv_norm_out(h)
         h = decoder.conv_act(h)
         image = decoder.conv_out(h)
