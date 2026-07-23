@@ -51,7 +51,7 @@ class FeatureFuser(nn.Module):
             nn.Conv2d(self.target_dim+3, 256, kernel_size=3, padding=1, bias=False),
             nn.GroupNorm(16, 256),
             nn.ReLU(inplace=True),
-            nn.Dropout(0.1) # 加一点 Dropout 防止过拟合 Block 5
+            nn.Dropout(0.1)
         )
 
         self.to(self.device)
