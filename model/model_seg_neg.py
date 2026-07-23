@@ -209,7 +209,7 @@ class DiffusionBasedNetwork(nn.Module):
         for key, values in cross_attention_maps.items():
             if len(values) == 0 or key in [8, 64]: continue
             if self.index is None:
-                values = values.mean(1) # 使用所有注意力头的平均
+                values = values.mean(1) 
             else:
                 values = values[:, self.index[key]].mean(1)
             normed_attn = values / values.sum(dim=(-2, -1), keepdim=True) 
@@ -217,7 +217,7 @@ class DiffusionBasedNetwork(nn.Module):
                 normed_attn = F.interpolate(normed_attn, size=(64, 64), mode='bilinear', align_corners=False) 
             cross_attention.append(weight_layer[key] * normed_attn)  
         cross_attention = torch.stack(cross_attention, dim=0).sum(0)[0]  
-        if self.no_use_cluster: #可选的特征聚类
+        if self.no_use_cluster: 
             dfc = DFC_KL(32, 20, 64)
             clusters, n = dfc(cross_attention)
             one_hot = F.one_hot(clusters, n)
@@ -289,7 +289,7 @@ class DiffusionBasedNetwork(nn.Module):
         last_cls = None
         for idx, cls in enumerate(img_label):
             text += cls + " and "
-            self.token_start_ids.append( # token_start_ids[0] = 4 起始位置
+            self.token_start_ids.append( 
                 self.token_start_ids[idx - 1] + 1 + self.all_tokens[last_cls][0] if idx > 0 else 4)
             self.token_sel_ids.append([self.token_start_ids[-1] + sel_id for sel_id in self.all_tokens[cls][1]])
             last_cls = cls
