@@ -23,9 +23,9 @@ normalizer = T.Normalize(
 class DINOMaskRefiner(nn.Module):
     def __init__(self, in_channels=768, beta=10, iter_num=3, alpha=0.5):
         super().__init__()
-        self.beta = beta          # 控制对相似度的敏感度
-        self.iter_num = iter_num  # 随机游走迭代次数
-        self.alpha = alpha  # 融合比例:越小越信任 SD，越大越信任 DINO
+        self.beta = beta          
+        self.iter_num = iter_num  
+        self.alpha = alpha  
    
     def get_affinity(self, features):
 
@@ -43,11 +43,7 @@ class DINOMaskRefiner(nn.Module):
         return affinity
 
     def forward(self, pseudo_logits, dino_feat):
-        """
-        Args:
-            coarse_mask: [B, K, H, W]  SD生成的伪标签(Logits或Prob) [1,21,500,333]
-            dino_feat:   [B, C, h, w]  DINO提取的特征图 #[1,768,37,37]
-        """
+    
         h, w = dino_feat.shape[-2:]
         pseudo_logits = F.interpolate(pseudo_logits, size=(h, w), mode='bilinear', align_corners=False)
 
@@ -140,7 +136,7 @@ class DiffusionBasedNetwork(nn.Module):
         self.dino_refiner = DINOMaskRefiner(in_channels=self.dino_embed_dim, beta=10, iter_num=4, alpha=0.3)
 
         fused_feature, _, _ = self.fuser(torch.randn(1, 3, 512, 512), '')
-        seg_in_channels = fused_feature.shape[1]  # 返回单个特征张量
+        seg_in_channels = fused_feature.shape[1]  
     
         self.pseudo_mask_generator = nn.Sequential(
             nn.Conv2d(seg_in_channels, 256, 3, padding=1, bias=False),
@@ -216,11 +212,11 @@ class DiffusionBasedNetwork(nn.Module):
                 values = values.mean(1) # 使用所有注意力头的平均
             else:
                 values = values[:, self.index[key]].mean(1)
-            normed_attn = values / values.sum(dim=(-2, -1), keepdim=True) # 对每个注意力图进行归一化，确保所有像素权重和为 1
+            normed_attn = values / values.sum(dim=(-2, -1), keepdim=True) 
             if key != 64:
-                normed_attn = F.interpolate(normed_attn, size=(64, 64), mode='bilinear', align_corners=False) # 所有注意力图上采样为64*64
+                normed_attn = F.interpolate(normed_attn, size=(64, 64), mode='bilinear', align_corners=False) 
             cross_attention.append(weight_layer[key] * normed_attn)  
-        cross_attention = torch.stack(cross_attention, dim=0).sum(0)[0]  # 堆叠并相加 然后取第0个batch
+        cross_attention = torch.stack(cross_attention, dim=0).sum(0)[0]  
         if self.no_use_cluster: #可选的特征聚类
             dfc = DFC_KL(32, 20, 64)
             clusters, n = dfc(cross_attention)
@@ -239,10 +235,10 @@ class DiffusionBasedNetwork(nn.Module):
         if not self.no_use_self_ers:
             return super().get_att_map(cross_attention_maps, self_attention_maps)
         else:
-            # cross attention 特征归一化 & 上采样融合
+           
             cross_att = self.process_cross_att(cross_attention_maps).float()
             cross_attn = cross_att - cross_att.amin(dim=-2, keepdim=True)  # cross_att: 4096, 20
-            cross_attn = cross_attn / cross_attn.sum(dim=-2, keepdim=True)  # 归一化
+            cross_attn = cross_attn / cross_attn.sum(dim=-2, keepdim=True)  
 
             trans_mat = self_attention_maps[64][:, [1, 2]].mean(1).flatten(-2, -1).permute(0, 2, 1).float()
             trans_mat /= torch.amax(trans_mat, dim=-2, keepdim=True)
@@ -301,7 +297,6 @@ class DiffusionBasedNetwork(nn.Module):
         text = text[:-5] + " and other object and background, " + self.bg_context
         text_embedding = self.get_text_embedding(text)
         
-        # 增强特定token的权重
         meaning_index = reduce(add, self.token_sel_ids)
         text_embedding[:, meaning_index] *= self.enhanced if self.no_use_cross_enh else 1
             
@@ -317,7 +312,6 @@ class DiffusionBasedNetwork(nn.Module):
         w_grid = W // patch_size
         num_patches = h_grid * w_grid
 
-        # 提取最后一层 Patch Tokens
         hidden_states = outputs.hidden_states
 
         last_n_states = hidden_states[-self.n_last_blocks:] 
@@ -335,50 +329,42 @@ class DiffusionBasedNetwork(nn.Module):
         return dino_feat
 
     def forward(self, x, cls_label, mask=None, img_name=None):
-        # 准备文本嵌入
         active_classes = torch.where(cls_label[0] == 1)[0]
         text_embedding = self.prepare_text_embeddings(active_classes) # [1,77,1024]
 
-        # 提取融合特征用于生成 pseudo_mask
         fused_feature, cross_attention_maps, self_attention_maps = self.fuser(x, text_embedding) 
 
-        # 获取注意力图
-        # att_map = self.get_att_map(cross_attention_maps, self_attention_maps) 
-        # final_attention_map = torch.zeros(self.num_classes_cls, 512, 512, device=x.device)
-        # final_attention_map[active_classes] += att_map 
-        # final_attention_map = F.interpolate(final_attention_map[None], size=mask.shape[-2:], mode="bilinear", align_corners=False)[0] 
-        # valid_cam, attn_label = cam_to_label(final_attention_map[None].clone(), cls_label=cls_label, bkg_thre=self.cam_bg_thr) 
+        att_map = self.get_att_map(cross_attention_maps, self_attention_maps) 
+        final_attention_map = torch.zeros(self.num_classes_cls, 512, 512, device=x.device)
+        final_attention_map[active_classes] += att_map 
+        final_attention_map = F.interpolate(final_attention_map[None], size=mask.shape[-2:], mode="bilinear", align_corners=False)[0] 
+        valid_cam, attn_label = cam_to_label(final_attention_map[None].clone(), cls_label=cls_label, bkg_thre=self.cam_bg_thr) 
 
-        # 生成的伪预测
         pseudo_logits_low = self.pseudo_mask_generator(fused_feature)  # [1,21,64,64]
         # pseudo_logits = F.interpolate(pseudo_logits_low, size=mask.shape[-2:], mode='bilinear', align_corners=False)
 
         x_dino = F.interpolate(x, size=(518, 518), mode='bilinear', align_corners=False)
         dino_feat = self.extract_feature(normalizer(x_dino)) 
 
-        # 用 DINO 优化伪预测得到优化后的伪标签
         refined_pseudo_logits = self.dino_refiner(pseudo_logits_low.detach(), dino_feat.detach()) # [1,21,64,64]
         refined_pseudo_logits = F.interpolate(refined_pseudo_logits, size=mask.shape[-2:], mode='bilinear', align_corners=False) 
         refined_label = logits_to_label(refined_pseudo_logits, cls_label=cls_label) #[1,500,333]
         # refined_label = logits_to_label(pseudo_logits, cls_label=cls_label) #[1,500,333]
 
-        # 纯视觉分支前向
         pred = self.seg_head(dino_feat) 
         pred = F.interpolate(pred, size=mask.shape[-2:], mode='bilinear', align_corners=False) 
 
-        # return pseudo_logits, attn_label, pred, refined_label
-        return refined_label
+        return pseudo_logits, attn_label, pred, refined_label
     
     def get_param_groups(self):
         param_group = [[], [], []] # feature_fuser, pseudo_mask_generator, seg_head
 
-        # 特征融合网络
         for param in self.fuser.parameters():
             param_group[0].append(param)
-        # 伪掩码生成器参数
+
         for param in self.pseudo_mask_generator.parameters():
             param_group[1].append(param)
-        # 分割头参数
+    
         for param in self.seg_head.parameters():
             param_group[2].append(param)
 
